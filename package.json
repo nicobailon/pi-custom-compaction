@@ -1,0 +1,57 @@
+{
+  "name": "pi-custom-compaction",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Custom compaction for pi — swap the model, template, and trigger for context compaction",
+  "author": "Nico Bailon",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nicobailon/pi-custom-compaction.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nicobailon/pi-custom-compaction/issues"
+  },
+  "homepage": "https://github.com/nicobailon/pi-custom-compaction#readme",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "compaction",
+    "context-management",
+    "extension"
+  ],
+  "files": [
+    "index.ts",
+    "commands/register-commands.ts",
+    "events/register-events.ts",
+    "policy/config.ts",
+    "policy/merge.ts",
+    "policy/parse.ts",
+    "policy/types.ts",
+    "runtime/model-resolution.ts",
+    "runtime/pure.ts",
+    "runtime/session-state.ts",
+    "summary/generate.ts",
+    "summary/template.ts",
+    "banner.png",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "tsx --test test/**/*.test.ts"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-agent-core": "^0.57.1",
+    "@mariozechner/pi-ai": "^0.57.1",
+    "@mariozechner/pi-coding-agent": "^0.57.1",
+    "@mariozechner/pi-tui": "^0.57.1",
+    "tsx": "^4.20.5"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

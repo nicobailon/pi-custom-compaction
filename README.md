@@ -10,6 +10,12 @@ Once enabled, the extension intercepts every compaction — whether triggered by
 
 Off by default. Pi's built-in compaction works normally until you enable it.
 
+## Installation
+
+```bash
+pi install npm:pi-custom-compaction
+```
+
 ## Quick start
 
 Create `~/.pi/agent/compaction-policy.json` (global) or `<project>/.pi/compaction-policy.json` (project, takes priority):

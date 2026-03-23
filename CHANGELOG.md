@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 — 2026-03-23
+
+- Bump devDependencies to `^0.62.0`
+
 ## 0.2.0 — 2026-03-22
 
 - **Profile model overrides** — profiles can now override the `models` list per session model. Use a different summarization model when chatting with Opus vs Codex.

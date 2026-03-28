@@ -36,41 +36,39 @@ export function getLastAssistantMessage(messages: AgentMessage[]): AssistantMess
 async function tryResolveModel(
 	ctx: ExtensionContext,
 	selector: string,
-): Promise<{ model: Model<Api>; apiKey: string } | undefined> {
+): Promise<{ model: Model<Api>; apiKey?: string; headers?: Record<string, string> } | { reason: string } | undefined> {
 	const parts = parseSelector(selector);
 	if (!parts.ok) return undefined;
 
 	const model = ctx.modelRegistry.find(parts.value.provider, parts.value.modelId);
-	if (!model) return undefined;
+	if (!model) return { reason: `model not found: ${parts.value.provider}/${parts.value.modelId}` };
 
-	let apiKey: string | undefined;
-	try {
-		apiKey = await ctx.modelRegistry.getApiKey(model);
-	} catch {
-		// Caller iterates models and reports the full list if all fail
-		return undefined;
-	}
-	if (!apiKey) return undefined;
+	const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+	if (!auth.ok) return { reason: `${selector}: ${auth.error}` };
 
-	return { model, apiKey };
+	return { model, apiKey: auth.apiKey, headers: auth.headers };
 }
 
 export async function resolveSummaryModel(
 	ctx: ExtensionContext,
 	policy: CompactionPolicy,
 	notify: NotifyFn,
-): Promise<{ entry: ModelEntry; model: Model<Api>; apiKey: string } | undefined> {
+): Promise<{ entry: ModelEntry; model: Model<Api>; apiKey?: string; headers?: Record<string, string> } | undefined> {
+	const failures: string[] = [];
 	for (const entry of policy.models) {
 		const resolved = await tryResolveModel(ctx, entry.model);
-		if (resolved) return { entry, model: resolved.model, apiKey: resolved.apiKey };
+		if (!resolved) continue;
+		if ("reason" in resolved) { failures.push(resolved.reason); continue; }
+		return { entry, model: resolved.model, apiKey: resolved.apiKey, headers: resolved.headers };
 	}
 
 	const tried = policy.models.map((e) => e.model).join(", ");
+	const detail = failures.length > 0 ? ` [${failures.join("; ")}]` : "";
 	notify(
 		ctx,
 		policy,
 		"warning",
-		`No compaction models could be resolved (tried: ${tried}). Falling back to default compaction.`,
+		`No compaction models could be resolved (tried: ${tried}).${detail} Falling back to default compaction.`,
 		{ dedupeKey: `no-models:${tried}` },
 	);
 	return undefined;

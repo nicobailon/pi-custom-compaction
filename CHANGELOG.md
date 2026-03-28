@@ -1,19 +1,21 @@
 # Changelog
 
-## 0.2.1 — 2026-03-23
+## 0.2.2 — 2026-03-28
 
-- Bump devDependencies to `^0.62.0`
-
-## 0.2.0 — 2026-03-22
-
+- **OAuth/headers auth fix** — model resolution now uses `getApiKeyAndHeaders` (the actual SDK API) and threads headers through the entire summarization chain. Fixes OAuth-authenticated providers.
+- **Diagnostic failure reasons** — when model resolution fails, the warning notification now includes specific reasons per model (e.g., "model not found", auth errors) instead of just listing which models were tried.
 - **Profile model overrides** — profiles can now override the `models` list per session model. Use a different summarization model when chatting with Opus vs Codex.
 - **Profile template paths** — profiles can specify explicit `template` and `updateTemplate` paths, overriding convention-based discovery. Tilde-expanded.
 - **Compaction spinner widget** — animated `Loader` spinner displays during extension-initiated compaction, matching pi's built-in appearance.
 - **Post-compaction status fix** — status bar no longer shows `?` for 1-2 messages after compaction. Shows just the label until token counts are available again.
 - **Watchdog widget cleanup** — if compaction hangs and the 2-minute watchdog fires, the spinner widget is now properly removed.
-- **Test suite** — 62 tests across 6 files covering parse, merge, config, pure logic, model resolution, and template discovery. Run with `tsx --test test/*.test.ts`.
+- **Test suite** — 64 tests across 6 files covering parse, merge, config, pure logic, model resolution, and template discovery. Run with `tsx --test test/*.test.ts`.
 
-## 0.1.0 — 2026-03-21
+## 0.2.1 — 2026-03-23
+
+- Bump devDependencies to `^0.62.0`
+
+## 0.2.0 — 2026-03-22
 
 Initial release.
 

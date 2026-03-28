@@ -19,7 +19,8 @@ async function generateCustomCompaction(
 	updateTemplate: string | undefined,
 	summarySettings: SummaryPolicy,
 	model: Model<Api>,
-	apiKey: string,
+	apiKey: string | undefined,
+	headers?: Record<string, string>,
 ) {
 	const reserveTokens = getReserveTokens(event);
 	const summaryPrompt = buildSummaryPrompt(
@@ -40,6 +41,7 @@ async function generateCustomCompaction(
 					event.signal,
 					summarySettings.thinkingLevel,
 					event.preparation.previousSummary,
+					headers,
 			  )
 			: event.preparation.previousSummary ?? "No prior history.";
 	if (!historySummary.trim()) {
@@ -55,6 +57,7 @@ async function generateCustomCompaction(
 					reserveTokens,
 					event.signal,
 					summarySettings.thinkingLevel,
+					headers,
 			  )
 			: undefined;
 	if (turnPrefixSummary !== undefined && !turnPrefixSummary.trim()) {
@@ -166,6 +169,7 @@ export function registerEvents(pi: ExtensionAPI, runtime: RuntimeServices): void
 						summarySettings,
 						resolved.model,
 						resolved.apiKey,
+						resolved.headers,
 				  )
 				: await compact(
 						event.preparation,

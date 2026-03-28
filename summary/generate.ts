@@ -30,12 +30,13 @@ Be concise. Focus on what's needed to understand the retained recent work.`;
 export async function generateTemplateSummary(
 	messages: AgentMessage[],
 	model: Model<Api>,
-	apiKey: string,
+	apiKey: string | undefined,
 	promptText: string,
 	reserveTokens: number,
 	signal: AbortSignal,
 	thinkingLevel: SummaryThinkingLevel,
 	previousSummary?: string,
+	headers?: Record<string, string>,
 ): Promise<string> {
 	const llmMessages = convertToLlm(messages);
 	const conversationText = serializeConversation(llmMessages);
@@ -60,6 +61,7 @@ export async function generateTemplateSummary(
 		reserveTokens,
 		0.8,
 		thinkingLevel,
+		headers,
 	);
 	const response = await completeSimple(
 		model,
@@ -80,10 +82,11 @@ export async function generateTemplateSummary(
 export async function generateTurnPrefixSummary(
 	messages: AgentMessage[],
 	model: Model<Api>,
-	apiKey: string,
+	apiKey: string | undefined,
 	reserveTokens: number,
 	signal: AbortSignal,
 	thinkingLevel: SummaryThinkingLevel,
+	headers?: Record<string, string>,
 ): Promise<string> {
 	const llmMessages = convertToLlm(messages);
 	const conversationText = serializeConversation(llmMessages);
@@ -96,6 +99,7 @@ export async function generateTurnPrefixSummary(
 		reserveTokens,
 		0.5,
 		thinkingLevel,
+		headers,
 	);
 	const response = await completeSimple(
 		model,
@@ -170,15 +174,16 @@ export function getReserveTokens(event: SessionBeforeCompactEvent): number {
 
 function getSummarizationCompletionOptions(
 	model: Model<Api>,
-	apiKey: string,
+	apiKey: string | undefined,
 	signal: AbortSignal,
 	reserveTokens: number,
 	ratio: number,
 	thinkingLevel: SummaryThinkingLevel,
-): { maxTokens: number; signal: AbortSignal; apiKey: string; reasoning?: "low" | "medium" | "high" } {
+	headers?: Record<string, string>,
+): { maxTokens: number; signal: AbortSignal; apiKey?: string; headers?: Record<string, string>; reasoning?: "low" | "medium" | "high" } {
 	const maxTokens = Math.max(256, Math.floor(reserveTokens * ratio));
 	if (!model.reasoning || thinkingLevel === "off") {
-		return { maxTokens, signal, apiKey };
+		return { maxTokens, signal, apiKey, headers };
 	}
-	return { maxTokens, signal, apiKey, reasoning: thinkingLevel };
+	return { maxTokens, signal, apiKey, headers, reasoning: thinkingLevel };
 }

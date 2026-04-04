@@ -36,17 +36,22 @@ export function getLastAssistantMessage(messages: AgentMessage[]): AssistantMess
 async function tryResolveModel(
 	ctx: ExtensionContext,
 	selector: string,
-): Promise<{ model: Model<Api>; apiKey?: string; headers?: Record<string, string> } | { reason: string } | undefined> {
+): Promise<{ model: Model<Api>; apiKey?: string; headers?: Record<string, string> } | { reason: string }> {
 	const parts = parseSelector(selector);
-	if (!parts.ok) return undefined;
+	if (!parts.ok) return { reason: `${selector}: ${parts.error}` };
 
-	const model = ctx.modelRegistry.find(parts.value.provider, parts.value.modelId);
-	if (!model) return { reason: `model not found: ${parts.value.provider}/${parts.value.modelId}` };
+	try {
+		const model = ctx.modelRegistry.find(parts.value.provider, parts.value.modelId);
+		if (!model) return { reason: `model not found: ${parts.value.provider}/${parts.value.modelId}` };
 
-	const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-	if (!auth.ok) return { reason: `${selector}: ${auth.error}` };
+		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+		if (!auth.ok) return { reason: `${selector}: ${auth.error}` };
 
-	return { model, apiKey: auth.apiKey, headers: auth.headers };
+		return { model, apiKey: auth.apiKey, headers: auth.headers };
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		return { reason: `${selector}: failed to resolve model auth (${message})` };
+	}
 }
 
 export async function resolveSummaryModel(
@@ -57,8 +62,10 @@ export async function resolveSummaryModel(
 	const failures: string[] = [];
 	for (const entry of policy.models) {
 		const resolved = await tryResolveModel(ctx, entry.model);
-		if (!resolved) continue;
-		if ("reason" in resolved) { failures.push(resolved.reason); continue; }
+		if ("reason" in resolved) {
+			failures.push(resolved.reason);
+			continue;
+		}
 		return { entry, model: resolved.model, apiKey: resolved.apiKey, headers: resolved.headers };
 	}
 

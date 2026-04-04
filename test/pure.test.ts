@@ -163,6 +163,7 @@ describe("resolveEffectivePolicy", () => {
 				match: "openai/gpt-4",
 				trigger: { minTokens: 700 },
 				summary: { thinkingLevel: "high" },
+				summaryRetention: { mode: "percent", value: 20 },
 			},
 		};
 		const result = resolveEffectivePolicy({ model: { provider: "openai", id: "gpt-4" } }, base);
@@ -171,6 +172,7 @@ describe("resolveEffectivePolicy", () => {
 		assert.equal(result.sessionModel, "openai/gpt-4");
 		assert.equal(result.policy.trigger.minTokens, 700);
 		assert.equal(result.policy.summary.thinkingLevel, "high");
+		assert.deepEqual(result.policy.summaryRetention, { mode: "percent", value: 20 });
 	});
 });
 

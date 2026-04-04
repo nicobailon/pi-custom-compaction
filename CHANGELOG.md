@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.4 — 2026-04-04
+
+- Add `summaryRetention` policy controls for raw context retention with two modes: `tokens` (direct `keepRecentTokens` override) and `percent` (computed from `min(session model window, summary model window)`).
+- Support `summaryRetention` overrides inside profiles.
+- Add runtime fallback behavior for invalid/impossible retention resolutions: emit warning and hand off to Pi default compaction for that compaction run.
+- Rebuild compaction preparation in the extension when retention overrides are active so custom keep boundaries apply before summary generation.
+- Surface retention info in `/compact-policy` output and status bar text (`keep 20%`, `keep 40000t`).
+- Expand tests with retention parsing/merge coverage, retention resolution/rebuild unit tests, and `session_before_compact` fallback integration coverage.
+
 ## 0.2.3 — 2026-04-04
 
 - Bump pi package devDependencies to `^0.65.0` (`@mariozechner/pi-agent-core`, `@mariozechner/pi-ai`, `@mariozechner/pi-coding-agent`, `@mariozechner/pi-tui`) for compatibility with current pi SDK/tooling.

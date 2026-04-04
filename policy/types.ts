@@ -30,6 +30,11 @@ export interface SummaryPolicy {
 	preservationInstruction: string;
 }
 
+export interface SummaryRetentionPolicy {
+	mode: "tokens" | "percent";
+	value: number;
+}
+
 export interface CompactionPolicy {
 	enabled: boolean;
 	trigger: {
@@ -47,6 +52,7 @@ export interface CompactionPolicy {
 		minimalStatus: boolean;
 	};
 	summary: SummaryPolicy;
+	summaryRetention?: SummaryRetentionPolicy;
 	profiles?: Record<string, ProfileOverride>;
 }
 
@@ -56,6 +62,7 @@ export interface CompactionPolicyPatch {
 	models?: ModelEntry[];
 	ui?: Partial<CompactionPolicy["ui"]>;
 	summary?: Partial<CompactionPolicy["summary"]>;
+	summaryRetention?: SummaryRetentionPolicy;
 	profiles?: Record<string, ProfileOverride>;
 }
 
@@ -84,6 +91,7 @@ export interface ProfileOverride {
 	trigger?: Partial<CompactionPolicy["trigger"]>;
 	models?: ModelEntry[];
 	summary?: SummaryModelOverride;
+	summaryRetention?: SummaryRetentionPolicy;
 	template?: string;
 	updateTemplate?: string;
 }

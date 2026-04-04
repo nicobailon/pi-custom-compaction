@@ -59,6 +59,18 @@ describe("parsePolicyPatch", () => {
 		});
 	});
 
+	it("parses summaryRetention in both tokens and percent modes", () => {
+		assert.deepEqual(parsePolicyPatch({ summaryRetention: { mode: "tokens", value: "24000" } }), {
+			ok: true,
+			value: { summaryRetention: { mode: "tokens", value: 24000 } },
+		});
+
+		assert.deepEqual(parsePolicyPatch({ summaryRetention: { mode: "percent", value: "20" } }), {
+			ok: true,
+			value: { summaryRetention: { mode: "percent", value: 20 } },
+		});
+	});
+
 	it("parses models array with string and object entries", () => {
 		const result = parsePolicyPatch({
 			models: [
@@ -82,7 +94,7 @@ describe("parsePolicyPatch", () => {
 		]);
 	});
 
-	it("parses profiles with trigger, models, summary, and template overrides", () => {
+	it("parses profiles with trigger, models, summary, retention, and template overrides", () => {
 		const result = parsePolicyPatch({
 			profiles: {
 				codex: {
@@ -93,6 +105,7 @@ describe("parsePolicyPatch", () => {
 						thinkingLevel: "low",
 						preservationInstruction: "Preserve filenames and error text.",
 					},
+					summaryRetention: { mode: "percent", value: 15 },
 					template: "~/.pi/agent/templates/codex.md",
 					updateTemplate: "~/.pi/agent/templates/codex-update.md",
 				},
@@ -109,6 +122,7 @@ describe("parsePolicyPatch", () => {
 					thinkingLevel: "low",
 					preservationInstruction: "Preserve filenames and error text.",
 				},
+				summaryRetention: { mode: "percent", value: 15 },
 				template: "~/.pi/agent/templates/codex.md",
 				updateTemplate: "~/.pi/agent/templates/codex-update.md",
 			},
@@ -188,6 +202,21 @@ describe("parsePolicyPatch", () => {
 		});
 	});
 
+	it("rejects invalid summaryRetention values", () => {
+		assert.deepEqual(parsePolicyPatch({ summaryRetention: { mode: "ratio", value: 20 } }), {
+			ok: false,
+			error: 'Invalid summaryRetention: mode must be "tokens" or "percent"',
+		});
+		assert.deepEqual(parsePolicyPatch({ summaryRetention: { mode: "tokens", value: "2.5" } }), {
+			ok: false,
+			error: "Invalid summaryRetention: tokens mode value: expected base-10 non-negative integer",
+		});
+		assert.deepEqual(parsePolicyPatch({ summaryRetention: { mode: "percent", value: 120 } }), {
+			ok: false,
+			error: "Invalid summaryRetention: percent mode value: expected percent in [0,100]",
+		});
+	});
+
 	it('rejects profiles missing the required "match" field', () => {
 		assert.deepEqual(parsePolicyPatch({ profiles: { fast: { trigger: { minTokens: 10 } } } }), {
 			ok: false,
@@ -200,6 +229,23 @@ describe("parsePolicyPatch", () => {
 			ok: false,
 			error: "profiles.fast: unknown key: extra",
 		});
+	});
+
+	it("rejects invalid profile summaryRetention values", () => {
+		assert.deepEqual(
+			parsePolicyPatch({
+				profiles: {
+					fast: {
+						match: "openai/gpt-4",
+						summaryRetention: { mode: "percent", value: -1 },
+					},
+				},
+			}),
+			{
+				ok: false,
+				error: "profiles.fast.summaryRetention: percent mode value: expected percent in [0,100]",
+			},
+		);
 	});
 });
 

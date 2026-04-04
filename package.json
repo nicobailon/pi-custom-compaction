@@ -1,6 +1,6 @@
 {
   "name": "pi-custom-compaction",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "type": "module",
   "description": "Custom compaction for pi — swap the model, template, and trigger for context compaction",
   "author": "Nico Bailon",
@@ -31,6 +31,7 @@
     "policy/types.ts",
     "runtime/model-resolution.ts",
     "runtime/pure.ts",
+    "runtime/retention.ts",
     "runtime/session-state.ts",
     "summary/generate.ts",
     "summary/template.ts",

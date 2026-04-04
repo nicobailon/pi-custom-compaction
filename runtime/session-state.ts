@@ -3,6 +3,7 @@ import { Loader } from "@mariozechner/pi-tui";
 import { mergePolicy } from "../policy/merge.js";
 import { readProjectPolicyPatch } from "../policy/config.js";
 import { DEFAULT_POLICY, type CompactionPolicy } from "../policy/types.js";
+import { formatSummaryRetention } from "./retention.js";
 
 const STATUS_KEY = "compact-policy";
 const WATCHDOG_MS = 120_000;
@@ -117,16 +118,18 @@ export function createRuntimeServices(): RuntimeServices {
 
 		const base = policy.ui.name;
 		const prefix = activeProfileName ? `${base}: ${activeProfileName}` : base;
+		const retentionText = formatSummaryRetention(policy.summaryRetention);
+		const statusPrefix = retentionText ? `${prefix} · ${retentionText}` : prefix;
 
 		if (inFlight.active) {
-			ctx.ui.setStatus(STATUS_KEY, `${prefix} · compacting…`);
+			ctx.ui.setStatus(STATUS_KEY, `${statusPrefix} · compacting…`);
 			return;
 		}
 
 		const usage = ctx.getContextUsage();
 
 		if (!usage || usage.tokens === null) {
-			ctx.ui.setStatus(STATUS_KEY, postCompact ? prefix : `${prefix} · ?`);
+			ctx.ui.setStatus(STATUS_KEY, postCompact ? statusPrefix : `${statusPrefix} · ?`);
 			return;
 		}
 		postCompact = false;
@@ -140,8 +143,8 @@ export function createRuntimeServices(): RuntimeServices {
 		ctx.ui.setStatus(
 			STATUS_KEY,
 			policy.ui.minimalStatus
-				? `${prefix} · ${pct.toFixed(0)}%`
-				: `${prefix} · ${pct.toFixed(1)}% (${usage.tokens}/${limit})`,
+				? `${statusPrefix} · ${pct.toFixed(0)}%`
+				: `${statusPrefix} · ${pct.toFixed(1)}% (${usage.tokens}/${limit})`,
 		);
 	}
 

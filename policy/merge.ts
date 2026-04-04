@@ -53,6 +53,7 @@ export function mergePolicy(base: CompactionPolicy, patch: CompactionPolicyPatch
 		models: patch.models ?? base.models,
 		ui: { ...base.ui, ...(patch.ui ?? {}) },
 		summary: { ...base.summary, ...(patch.summary ?? {}) },
+		summaryRetention: patch.summaryRetention ?? base.summaryRetention,
 		profiles: patch.profiles !== undefined ? patch.profiles : base.profiles,
 	};
 }
@@ -63,5 +64,6 @@ export function applyProfileOverrides(policy: CompactionPolicy, profile: Profile
 		trigger: { ...policy.trigger, ...(profile.trigger ?? {}) },
 		models: profile.models ?? policy.models,
 		summary: { ...policy.summary, ...(profile.summary ?? {}) },
+		summaryRetention: profile.summaryRetention ?? policy.summaryRetention,
 	};
 }

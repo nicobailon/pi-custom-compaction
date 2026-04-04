@@ -31,12 +31,13 @@ Create `~/.pi/agent/compaction-policy.json` (global) or `<project>/.pi/compactio
 
 Run `/reload`. Done. Pi still decides when to compact — you just swapped the model.
 
-To also control **when** it triggers:
+To also control **when** it triggers and how much raw context is retained:
 
 ```json
 {
   "enabled": true,
   "trigger": { "maxTokens": 350000 },
+  "summaryRetention": { "mode": "percent", "value": 20 },
   "ui": { "name": "ctx" },
   "models": [
     { "model": "anthropic/claude-haiku-4-5", "thinkingLevel": "medium" },
@@ -45,18 +46,20 @@ To also control **when** it triggers:
 }
 ```
 
-Status bar shows: `ctx · 24.7% (86426/350000)`
+Status bar shows: `ctx · keep 20% · 24.7% (86426/350000)`
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
-| `/compact-policy` | Shows effective config (models, trigger, profile, template) |
+| `/compact-policy` | Shows effective config (models, trigger, retention, profile, template) |
 | `/compact-now [focus]` | Triggers compaction immediately |
 
 ## Models
 
 Ordered fallback chain. Tries each model in order, uses the first one that resolves. If credits run out on one, the next takes over.
+
+Choose compaction models with enough context window for the history they need to summarize. A small cheap model can work for lighter sessions, but if its context window is too small relative to the session history or your retention settings, compaction may fall back to Pi's default behavior instead of using the extension's custom path.
 
 Plain strings inherit base `summary` settings. Objects let you override per model:
 
@@ -76,6 +79,50 @@ Plain strings inherit base `summary` settings. Objects let you override per mode
 | `cooldownMs` | Min time between proactive compactions | 60000 |
 
 `maxTokens` makes compaction happen sooner. Without it, Pi waits until the context window is almost full (~984K on a 1M model). With `maxTokens: 350000`, compaction fires at 350K instead.
+
+## Raw retention (`summaryRetention`)
+
+Control how much recent context stays raw before summarization.
+
+Add `summaryRetention` to your compaction config file:
+
+- global: `~/.pi/agent/compaction-policy.json`
+- project: `<project>/.pi/compaction-policy.json`
+
+If both exist, the project file takes priority over the global one.
+
+Example using an exact token budget:
+
+```json
+{
+  "enabled": true,
+  "summaryRetention": { "mode": "tokens", "value": 40000 },
+  "models": [
+    { "model": "anthropic/claude-sonnet-4", "thinkingLevel": "medium" }
+  ]
+}
+```
+
+Example using a percent of context window:
+
+```json
+{
+  "enabled": true,
+  "summaryRetention": { "mode": "percent", "value": 20 },
+  "models": [
+    { "model": "anthropic/claude-sonnet-4", "thinkingLevel": "medium" }
+  ]
+}
+```
+
+- `tokens`: direct override for effective `keepRecentTokens`
+- `percent`: computes keep tokens from `min(session model window, summary model window)`
+
+In percent mode, the summary model's context window matters too. If you choose a small fast model for compaction, it can reduce the usable retention budget or make your configured retention impossible for that run.
+
+After editing the config, run `/reload` in Pi.
+
+If retention config is invalid at runtime, or the computed keep budget is impossible with the current reserve/window, the extension warns and falls back to Pi default compaction for that compaction run.
 
 ## How maxTokens interacts with the context window
 
@@ -97,13 +144,14 @@ You don't need to tune `maxTokens` per model. One config works across models wit
 
 ## Profiles
 
-Override trigger, models, and summary settings per session model:
+Override trigger, models, summary settings, and retention per session model:
 
 ```json
 "profiles": {
   "opus-large-ctx": {
     "match": "anthropic/claude-opus-4-6",
     "trigger": { "maxTokens": 500000 },
+    "summaryRetention": { "mode": "percent", "value": 15 },
     "models": [{ "model": "anthropic/claude-haiku-4-5", "thinkingLevel": "medium" }],
     "template": "~/.pi/agent/templates/opus.md",
     "updateTemplate": "~/.pi/agent/templates/opus-update.md"
@@ -116,7 +164,7 @@ Override trigger, models, and summary settings per session model:
 }
 ```
 
-`match` is the exact `provider/modelId` of the session model. First alphabetical match wins. Profile `models` replaces the base models list for that session. `template` and `updateTemplate` override template discovery with explicit paths (tilde-expanded). Active profile shows in the status bar.
+`match` is the exact `provider/modelId` of the session model. First alphabetical match wins. Profile `models` replaces the base models list for that session. `summaryRetention` overrides base retention for the matched session model. `template` and `updateTemplate` override template discovery with explicit paths (tilde-expanded). Active profile shows in the status bar.
 
 ## Templates (optional)
 
@@ -227,9 +275,9 @@ Example update template (`compaction-template-update.md`):
 Status bar examples:
 
 ```
-ctx · 24.7% (86426/350000)
-ctx: opus-large-ctx · 50.1% (250500/500000)
-ctx · 31%
+ctx · keep 20% · 24.7% (86426/350000)
+ctx: opus-large-ctx · keep 15% · 50.1% (250500/500000)
+ctx · keep 40000t · 31%
 ```
 
 ## Summary options

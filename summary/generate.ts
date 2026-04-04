@@ -1,11 +1,7 @@
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { completeSimple } from "@mariozechner/pi-ai";
 import type { Api, Model } from "@mariozechner/pi-ai";
-import {
-	convertToLlm,
-	serializeConversation,
-	type SessionBeforeCompactEvent,
-} from "@mariozechner/pi-coding-agent";
+import { convertToLlm, serializeConversation } from "@mariozechner/pi-coding-agent";
 import type { CompactionDetails, SummaryThinkingLevel } from "../policy/types.js";
 
 const SUMMARIZATION_SYSTEM_PROMPT = `You are a context summarization assistant. Your task is to read a conversation between a user and an AI coding assistant, then produce a structured summary following the exact format specified.
@@ -166,10 +162,6 @@ export function formatFileOperations(details: CompactionDetails): string {
 	}
 	if (sections.length === 0) return "";
 	return `\n\n${sections.join("\n\n")}`;
-}
-
-export function getReserveTokens(event: SessionBeforeCompactEvent): number {
-	return event.preparation.settings.reserveTokens || 16_384;
 }
 
 function getSummarizationCompletionOptions(

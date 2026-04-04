@@ -7,6 +7,7 @@ import {
 	POLICY_KEYS,
 	type ProfileOverride,
 	type SummaryModelOverride,
+	type SummaryRetentionPolicy,
 	type SummaryThinkingLevel,
 } from "./types.js";
 
@@ -161,6 +162,41 @@ function parseUiName(value: unknown): ParseResult<string> {
 	return parsed;
 }
 
+function parseSummaryRetention(value: unknown): ParseResult<SummaryRetentionPolicy> {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+		return { ok: false, error: "expected object" };
+	}
+
+	const raw = value as Record<string, unknown>;
+	const mode = raw.mode;
+	if (mode !== "tokens" && mode !== "percent") {
+		return { ok: false, error: "mode must be \"tokens\" or \"percent\"" };
+	}
+	if (!("value" in raw)) {
+		return { ok: false, error: 'missing required "value" field' };
+	}
+
+	for (const key of Object.keys(raw)) {
+		if (key !== "mode" && key !== "value") {
+			return { ok: false, error: `unknown key: ${key}` };
+		}
+	}
+
+	if (mode === "tokens") {
+		const parsedValue = parseNonNegativeInt(raw.value);
+		if (!parsedValue.ok) {
+			return { ok: false, error: `tokens mode value: ${parsedValue.error}` };
+		}
+		return { ok: true, value: { mode, value: parsedValue.value } };
+	}
+
+	const parsedValue = parsePercent(raw.value);
+	if (!parsedValue.ok) {
+		return { ok: false, error: `percent mode value: ${parsedValue.error}` };
+	}
+	return { ok: true, value: { mode, value: parsedValue.value } };
+}
+
 function parseSummaryModelOverride(value: unknown): ParseResult<SummaryModelOverride> {
 	if (typeof value !== "object" || value === null || Array.isArray(value)) {
 		return { ok: false, error: "expected object" };
@@ -240,6 +276,14 @@ function parseProfileOverride(name: string, value: unknown): ParseResult<Profile
 		profile.summary = parsedSummary.value;
 	}
 
+	if ("summaryRetention" in raw && raw.summaryRetention !== undefined) {
+		const parsedSummaryRetention = parseSummaryRetention(raw.summaryRetention);
+		if (!parsedSummaryRetention.ok) {
+			return { ok: false, error: `profiles.${name}.summaryRetention: ${parsedSummaryRetention.error}` };
+		}
+		profile.summaryRetention = parsedSummaryRetention.value;
+	}
+
 	if ("template" in raw && raw.template !== undefined) {
 		if (typeof raw.template !== "string" || !raw.template.trim() || raw.template.trim() !== raw.template) {
 			return { ok: false, error: `profiles.${name}.template: expected non-empty path string without surrounding whitespace` };
@@ -254,7 +298,7 @@ function parseProfileOverride(name: string, value: unknown): ParseResult<Profile
 		profile.updateTemplate = raw.updateTemplate;
 	}
 
-	const knownKeys = new Set(["match", "trigger", "models", "summary", "template", "updateTemplate"]);
+	const knownKeys = new Set(["match", "trigger", "models", "summary", "summaryRetention", "template", "updateTemplate"]);
 	for (const key of Object.keys(raw)) {
 		if (!knownKeys.has(key)) {
 			return { ok: false, error: `profiles.${name}: unknown key: ${key}` };
@@ -329,6 +373,14 @@ export function parsePolicyPatch(input: unknown): ParseResult<CompactionPolicyPa
 			const parsedProfiles = parseProfiles(sectionValue);
 			if (!parsedProfiles.ok) return parsedProfiles;
 			patch.profiles = parsedProfiles.value;
+			continue;
+		}
+		if (sectionKey === "summaryRetention") {
+			const parsedSummaryRetention = parseSummaryRetention(sectionValue);
+			if (!parsedSummaryRetention.ok) {
+				return { ok: false, error: `Invalid summaryRetention: ${parsedSummaryRetention.error}` };
+			}
+			patch.summaryRetention = parsedSummaryRetention.value;
 			continue;
 		}
 		if (!POLICY_SECTIONS.has(sectionKey)) {

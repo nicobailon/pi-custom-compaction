@@ -6,15 +6,17 @@ import {
 	formatFileOperations,
 	generateTemplateSummary,
 	generateTurnPrefixSummary,
-	getReserveTokens,
 } from "../summary/generate.js";
 import { buildSummaryPrompt, discoverTemplate, resolveSummarySettings } from "../summary/template.js";
 import { getLastAssistantMessage, resolveSummaryModel } from "../runtime/model-resolution.js";
 import { resolveEffectivePolicy, shouldTriggerProactiveCompact } from "../runtime/pure.js";
+import { rebuildPreparationWithKeepRecentTokens, resolveSummaryRetention } from "../runtime/retention.js";
 import type { RuntimeServices } from "../runtime/session-state.js";
 
 async function generateCustomCompaction(
-	event: SessionBeforeCompactEvent,
+	preparation: SessionBeforeCompactEvent["preparation"],
+	customInstructions: string | undefined,
+	signal: AbortSignal,
 	template: string,
 	updateTemplate: string | undefined,
 	summarySettings: SummaryPolicy,
@@ -22,40 +24,40 @@ async function generateCustomCompaction(
 	apiKey: string | undefined,
 	headers?: Record<string, string>,
 ) {
-	const reserveTokens = getReserveTokens(event);
+	const reserveTokens = preparation.settings.reserveTokens || 16_384;
 	const summaryPrompt = buildSummaryPrompt(
 		template,
 		updateTemplate,
-		event.preparation.previousSummary,
-		event.customInstructions,
+		preparation.previousSummary,
+		customInstructions,
 		summarySettings.preservationInstruction,
 	);
 	const historySummary =
-		event.preparation.messagesToSummarize.length > 0
+		preparation.messagesToSummarize.length > 0
 			? await generateTemplateSummary(
-					event.preparation.messagesToSummarize,
+					preparation.messagesToSummarize,
 					model,
 					apiKey,
 					summaryPrompt,
 					reserveTokens,
-					event.signal,
+					signal,
 					summarySettings.thinkingLevel,
-					event.preparation.previousSummary,
+					preparation.previousSummary,
 					headers,
 			  )
-			: event.preparation.previousSummary ?? "No prior history.";
+			: preparation.previousSummary ?? "No prior history.";
 	if (!historySummary.trim()) {
 		throw new Error("Custom template summarization returned empty summary");
 	}
 
 	const turnPrefixSummary =
-		event.preparation.isSplitTurn && event.preparation.turnPrefixMessages.length > 0
+		preparation.isSplitTurn && preparation.turnPrefixMessages.length > 0
 			? await generateTurnPrefixSummary(
-					event.preparation.turnPrefixMessages,
+					preparation.turnPrefixMessages,
 					model,
 					apiKey,
 					reserveTokens,
-					event.signal,
+					signal,
 					summarySettings.thinkingLevel,
 					headers,
 			  )
@@ -67,12 +69,12 @@ async function generateCustomCompaction(
 	const mergedSummary = turnPrefixSummary
 		? `${historySummary}\n\n---\n\n**Turn Context (split turn):**\n\n${turnPrefixSummary}`
 		: historySummary;
-	const details = computeFileLists(event.preparation.fileOps);
+	const details = computeFileLists(preparation.fileOps);
 	const summary = `${mergedSummary}${formatFileOperations(details)}`;
 	return {
 		summary,
-		firstKeptEntryId: event.preparation.firstKeptEntryId,
-		tokensBefore: event.preparation.tokensBefore,
+		firstKeptEntryId: preparation.firstKeptEntryId,
+		tokensBefore: preparation.tokensBefore,
 		details,
 	};
 }
@@ -131,10 +133,32 @@ export function registerEvents(pi: ExtensionAPI, runtime: RuntimeServices): void
 		runtime.setInFlight("session_before_compact");
 		runtime.updateStatus(ctx, policy);
 
+		const fallbackToDefaultCompaction = (warning?: string) => {
+			runtime.clearInFlight();
+			if (warning) runtime.notify(ctx, policy, "warning", warning);
+			runtime.updateStatus(ctx, policy);
+			return undefined;
+		};
+
 		const resolved = await resolveSummaryModel(ctx, policy, runtime.notify);
 		if (!resolved) {
-			runtime.clearInFlight();
-			return undefined;
+			return fallbackToDefaultCompaction();
+		}
+
+		const retention = resolveSummaryRetention(policy.summaryRetention, {
+			sessionContextWindow: ctx.model?.contextWindow,
+			summaryModelContextWindow: resolved.model.contextWindow,
+			reserveTokens: event.preparation.settings.reserveTokens,
+		});
+		if (retention.fallbackReason) {
+			return fallbackToDefaultCompaction(retention.fallbackReason);
+		}
+
+		const compactionPreparation = retention.resolution
+			? rebuildPreparationWithKeepRecentTokens(event.branchEntries, event.preparation, retention.resolution.keepRecentTokens)
+			: { preparation: event.preparation };
+		if (compactionPreparation.fallbackReason) {
+			return fallbackToDefaultCompaction(compactionPreparation.fallbackReason);
 		}
 
 		const summarySettings = resolveSummarySettings(policy, resolved.entry);
@@ -160,10 +184,18 @@ export function registerEvents(pi: ExtensionAPI, runtime: RuntimeServices): void
 			);
 		}
 
+		if (!templateResolution.template && !resolved.apiKey) {
+			return fallbackToDefaultCompaction(
+				`Compaction model ${resolved.entry.model} has no API key for built-in summary format. Falling back to Pi default compaction.`,
+			);
+		}
+
 		try {
 			const result = templateResolution.template
 				? await generateCustomCompaction(
-						event,
+						compactionPreparation.preparation,
+						event.customInstructions,
+						event.signal,
 						templateResolution.template,
 						templateResolution.updateTemplate,
 						summarySettings,
@@ -172,9 +204,10 @@ export function registerEvents(pi: ExtensionAPI, runtime: RuntimeServices): void
 						resolved.headers,
 				  )
 				: await compact(
-						event.preparation,
+						compactionPreparation.preparation,
 						resolved.model,
 						resolved.apiKey,
+						resolved.headers,
 						event.customInstructions,
 						event.signal,
 				  );
@@ -189,6 +222,7 @@ export function registerEvents(pi: ExtensionAPI, runtime: RuntimeServices): void
 			};
 		} catch (error) {
 			runtime.clearInFlight();
+			runtime.updateStatus(ctx, policy);
 			if (event.signal.aborted) return undefined;
 			const message = error instanceof Error ? error.message : String(error);
 			runtime.notify(ctx, policy, "error", `Compaction policy summary failed: ${message}`, {

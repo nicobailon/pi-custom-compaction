@@ -10,6 +10,7 @@ function makeBasePolicy(): CompactionPolicy {
 		models: [{ model: "openai/gpt-4" }],
 		ui: { ...DEFAULT_POLICY.ui },
 		summary: { ...DEFAULT_POLICY.summary },
+		summaryRetention: undefined,
 		profiles: {
 			default: {
 				match: "openai/gpt-4",
@@ -70,6 +71,14 @@ describe("mergePolicy", () => {
 		assert.equal(merged.summary.preservationInstruction, "Preserve stack traces.");
 		assert.equal(merged.summary.thinkingLevel, base.summary.thinkingLevel);
 	});
+
+	it("replaces summaryRetention when provided", () => {
+		const base = makeBasePolicy();
+		const merged = mergePolicy(base, {
+			summaryRetention: { mode: "percent", value: 20 },
+		});
+		assert.deepEqual(merged.summaryRetention, { mode: "percent", value: 20 });
+	});
 });
 
 describe("setPatchValue", () => {
@@ -116,13 +125,14 @@ describe("setPatchValue", () => {
 });
 
 describe("applyProfileOverrides", () => {
-	it("merges trigger, models, and summary overrides into policy", () => {
+	it("merges trigger, models, summary, and retention overrides into policy", () => {
 		const base = makeBasePolicy();
 		const result = applyProfileOverrides(base, {
 			match: "openai/gpt-4",
 			trigger: { cooldownMs: 5000 },
 			models: [{ model: "anthropic/claude-haiku-4-5" }],
 			summary: { thinkingLevel: "high" },
+			summaryRetention: { mode: "tokens", value: 30000 },
 		});
 
 		assert.equal(result.trigger.cooldownMs, 5000);
@@ -130,6 +140,7 @@ describe("applyProfileOverrides", () => {
 		assert.deepEqual(result.models, [{ model: "anthropic/claude-haiku-4-5" }]);
 		assert.equal(result.summary.thinkingLevel, "high");
 		assert.equal(result.summary.preservationInstruction, base.summary.preservationInstruction);
+		assert.deepEqual(result.summaryRetention, { mode: "tokens", value: 30000 });
 	});
 
 	it("returns unchanged policy when profile has no overrides", () => {

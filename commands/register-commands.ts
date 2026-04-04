@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 import { resolveEffectivePolicy } from "../runtime/pure.js";
+import { formatSummaryRetention } from "../runtime/retention.js";
 import type { RuntimeServices } from "../runtime/session-state.js";
 import { discoverTemplate } from "../summary/template.js";
 
@@ -31,11 +32,18 @@ export function registerCommands(pi: ExtensionAPI, runtime: RuntimeServices): vo
 				? `${template.updateResolvedPath ?? "(unknown)"} (invalid: ${template.updateFallbackReason}; using initial template)`
 				: template.updateResolvedPath ?? "(none — using initial template)";
 
+			const retention = formatSummaryRetention(policy.summaryRetention);
+			const retentionDetail = !retention
+				? "default Pi keepRecentTokens"
+				: policy.summaryRetention?.mode === "percent"
+				? `${retention} (basis: min(session window, summary model window))`
+				: retention;
 			const lines = [
 				`enabled: ${policy.enabled}`,
 				`models: ${formatModels(policy)}`,
 				`trigger: ${formatTrigger(policy)}`,
 				`summary: thinking=${policy.summary.thinkingLevel}`,
+				`summaryRetention: ${retentionDetail}`,
 				`session model: ${sessionModel ?? "unknown"}`,
 				`profile: ${profileName ?? "none"}`,
 				`template: ${templatePath}`,

@@ -1,6 +1,6 @@
 {
   "name": "pi-custom-compaction",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "description": "Custom compaction for pi — swap the model, template, and trigger for context compaction",
   "author": "Nico Bailon",
@@ -43,10 +43,10 @@
     "test": "tsx --test test/**/*.test.ts"
   },
   "devDependencies": {
-    "@mariozechner/pi-agent-core": "^0.62.0",
-    "@mariozechner/pi-ai": "^0.62.0",
-    "@mariozechner/pi-coding-agent": "^0.62.0",
-    "@mariozechner/pi-tui": "^0.62.0",
+    "@mariozechner/pi-agent-core": "^0.65.0",
+    "@mariozechner/pi-ai": "^0.65.0",
+    "@mariozechner/pi-coding-agent": "^0.65.0",
+    "@mariozechner/pi-tui": "^0.65.0",
     "tsx": "^4.20.5"
   },
   "pi": {

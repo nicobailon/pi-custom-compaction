@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3 — 2026-04-04
+
+- Bump pi package devDependencies to `^0.65.0` (`@mariozechner/pi-agent-core`, `@mariozechner/pi-ai`, `@mariozechner/pi-coding-agent`, `@mariozechner/pi-tui`) for compatibility with current pi SDK/tooling.
+
 ## 0.2.2 — 2026-03-28
 
 - **OAuth/headers auth fix** — model resolution now uses `getApiKeyAndHeaders` (the actual SDK API) and threads headers through the entire summarization chain. Fixes OAuth-authenticated providers.

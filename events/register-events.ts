@@ -212,16 +212,6 @@ export function registerEvents(pi: ExtensionAPI, runtime: RuntimeServices): void
 		initializeSessionStatus(ctx, runtime);
 	});
 
-	pi.on("session_switch", async (_event, ctx) => {
-		runtime.clearSessionScopedState(ctx);
-		initializeSessionStatus(ctx, runtime);
-	});
-
-	pi.on("session_fork", async (_event, ctx) => {
-		runtime.clearSessionScopedState(ctx);
-		initializeSessionStatus(ctx, runtime);
-	});
-
 	pi.on("session_tree", async (_event, ctx) => {
 		runtime.clearSessionScopedState(ctx);
 		initializeSessionStatus(ctx, runtime);

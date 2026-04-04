@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.5 — 2026-04-04
+
+- Add configurable `summaryRetention` controls so custom compaction can keep a chosen raw token amount or context-window percentage before summarizing older history.
+- Support `summaryRetention` profile overrides, surface retention info in `/compact-policy` and the status bar, and document global vs project config behavior more clearly.
+- Harden fallback behavior and model-resolution diagnostics for invalid selectors, impossible retention budgets, and thrown auth-resolution failures.
+- Expand tests for retention resolution, preparation rebuilding, fallback paths, and model-resolution error handling.
+
 ## 0.2.4 — 2026-04-04
 
 - Add `summaryRetention` policy controls for raw context retention with two modes: `tokens` (direct `keepRecentTokens` override) and `percent` (computed from `min(session model window, summary model window)`).

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { parseModelSelector, parsePolicyPatch } from "../policy/parse.ts";
+import { parseModelSelector, parsePolicyPatch, parseStatusColor } from "../policy/parse.ts";
 
 describe("parsePolicyPatch", () => {
 	it("accepts an empty object as an empty patch", () => {
@@ -274,5 +274,144 @@ describe("parseModelSelector", () => {
 				error: "expected model selector provider/modelId",
 			});
 		}
+	});
+});
+
+describe("parseStatusColor", () => {
+	const EXPECTED_ERROR =
+		'expected a ThemeColor token (e.g. "accent"), a hex color (e.g. "#00d7ff"), or an ANSI color name (e.g. "cyan", "brightMagenta")';
+
+	it("accepts a ThemeColor token", () => {
+		assert.deepEqual(parseStatusColor("accent"), {
+			ok: true,
+			value: { kind: "theme", token: "accent" },
+		});
+		assert.deepEqual(parseStatusColor("borderAccent"), {
+			ok: true,
+			value: { kind: "theme", token: "borderAccent" },
+		});
+		assert.deepEqual(parseStatusColor("bashMode"), {
+			ok: true,
+			value: { kind: "theme", token: "bashMode" },
+		});
+	});
+
+	it("accepts any identifier-shaped string as a theme token (validated lazily by theme.fg at render time)", () => {
+		// We intentionally do NOT hardcode pi's ThemeColor union here; instead,
+		// `theme.fg` rejects unknown tokens at render time and `styleStatusText`
+		// falls back to plain text. This test documents that intent.
+		assert.deepEqual(parseStatusColor("someFutureThemeToken"), {
+			ok: true,
+			value: { kind: "theme", token: "someFutureThemeToken" },
+		});
+	});
+
+	it("accepts a 6-digit hex color and bakes it into truecolor ANSI", () => {
+		assert.deepEqual(parseStatusColor("#00d7ff"), {
+			ok: true,
+			value: { kind: "ansi", open: "\x1b[38;2;0;215;255m", close: "\x1b[39m" },
+		});
+		assert.deepEqual(parseStatusColor("#FFFFFF"), {
+			ok: true,
+			value: { kind: "ansi", open: "\x1b[38;2;255;255;255m", close: "\x1b[39m" },
+		});
+	});
+
+	it("accepts a 3-digit hex color and expands it", () => {
+		assert.deepEqual(parseStatusColor("#f0a"), {
+			ok: true,
+			value: { kind: "ansi", open: "\x1b[38;2;255;0;170m", close: "\x1b[39m" },
+		});
+	});
+
+	it("accepts named ANSI colors (standard and bright)", () => {
+		assert.deepEqual(parseStatusColor("cyan"), {
+			ok: true,
+			value: { kind: "ansi", open: "\x1b[36m", close: "\x1b[39m" },
+		});
+		assert.deepEqual(parseStatusColor("brightMagenta"), {
+			ok: true,
+			value: { kind: "ansi", open: "\x1b[95m", close: "\x1b[39m" },
+		});
+	});
+
+	it("rejects malformed hex values", () => {
+		for (const value of ["#", "#00", "#12345", "#1234567", "#zzzzzz", "00d7ff"]) {
+			assert.deepEqual(parseStatusColor(value), { ok: false, error: EXPECTED_ERROR });
+		}
+	});
+
+	it("rejects unknown-shaped values and non-string input", () => {
+		// Shape rules: must be non-empty, no leading/trailing whitespace, and
+		// (if not hex/ANSI) must look like a camelCase identifier. `bright-magenta`
+		// and `bright_magenta` hit the wrong casing branch; ` accent ` has padding.
+		for (const value of [
+			"",
+			"bright-magenta",
+			"bright_magenta",
+			" accent ",
+			"1abc",
+			123,
+			null,
+			undefined,
+			{},
+			[],
+		]) {
+			assert.deepEqual(parseStatusColor(value), { ok: false, error: EXPECTED_ERROR });
+		}
+	});
+
+	it("round-trips through parsePolicyPatch for ui.statusColor", () => {
+		const result = parsePolicyPatch({ ui: { statusColor: "#00d7ff" } });
+		assert.equal(result.ok, true);
+		if (!result.ok) return;
+		assert.deepEqual(result.value, {
+			ui: { statusColor: { kind: "ansi", open: "\x1b[38;2;0;215;255m", close: "\x1b[39m" } },
+		});
+	});
+
+	it("reports ui.statusColor parse errors with the standard prefix", () => {
+		assert.deepEqual(parsePolicyPatch({ ui: { statusColor: "not-a-color" } }), {
+			ok: false,
+			error: `Invalid ui.statusColor: ${EXPECTED_ERROR}`,
+		});
+	});
+});
+
+describe("ui.statusColor end-to-end (parse -> merge -> styleStatusText)", () => {
+	// Inline import to avoid circular test-file concerns; keeps this near the
+	// parse tests it exercises.
+	it("round-trips a ThemeColor token all the way to theme.fg", async () => {
+		const { mergePolicy } = await import("../policy/merge.ts");
+		const { styleStatusText } = await import("../runtime/pure.ts");
+		const { DEFAULT_POLICY } = await import("../policy/types.ts");
+
+		const parsed = parsePolicyPatch({ ui: { statusColor: "accent" } });
+		assert.equal(parsed.ok, true);
+		if (!parsed.ok) return;
+
+		const merged = mergePolicy(DEFAULT_POLICY, parsed.value);
+		assert.deepEqual(merged.ui.statusColor, { kind: "theme", token: "accent" });
+
+		const styled = styleStatusText("x", merged.ui.statusColor, {
+			fg: (color, text) => `<fg:${color}>${text}</fg>`,
+		});
+		assert.equal(styled, "<fg:accent>x</fg>");
+	});
+
+	it("round-trips a hex color into a truecolor ANSI wrap", async () => {
+		const { mergePolicy } = await import("../policy/merge.ts");
+		const { styleStatusText } = await import("../runtime/pure.ts");
+		const { DEFAULT_POLICY } = await import("../policy/types.ts");
+
+		const parsed = parsePolicyPatch({ ui: { statusColor: "#00d7ff" } });
+		assert.equal(parsed.ok, true);
+		if (!parsed.ok) return;
+
+		const merged = mergePolicy(DEFAULT_POLICY, parsed.value);
+		const styled = styleStatusText("x", merged.ui.statusColor, {
+			fg: () => "SHOULD-NOT-BE-CALLED",
+		});
+		assert.equal(styled, "\x1b[38;2;0;215;255mx\x1b[39m");
 	});
 });

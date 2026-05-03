@@ -6,11 +6,13 @@ import {
 	type PolicyKey,
 	POLICY_KEYS,
 	type ProfileOverride,
+	type StatusColor,
 	type SummaryModelOverride,
 	type SummaryRetentionPolicy,
 	type SummaryThinkingLevel,
 } from "./types.js";
 
+import type { ThemeColor } from "@mariozechner/pi-coding-agent";
 const POLICY_SECTIONS = new Set(["trigger", "ui", "summary"]);
 
 function parsePolicyValue(key: PolicyKey, value: unknown): ParseResult<unknown> {
@@ -28,6 +30,8 @@ function parsePolicyValue(key: PolicyKey, value: unknown): ParseResult<unknown> 
 		case "ui.showStatus":
 		case "ui.minimalStatus":
 			return parseBooleanLiteral(value);
+		case "ui.statusColor":
+			return parseStatusColor(value);
 		case "summary.thinkingLevel":
 			return parseSummaryThinkingLevel(value);
 		case "summary.preservationInstruction":
@@ -160,6 +164,82 @@ function parseUiName(value: unknown): ParseResult<string> {
 		return { ok: false, error: "expected non-empty status name" };
 	}
 	return parsed;
+}
+
+/**
+ * Accepted shape for the theme-token form of `ui.statusColor`. We intentionally
+ * do NOT enumerate pi's full `ThemeColor` union here: pi doesn't export a
+ * runtime list, and duplicating the union invites drift. Any token that looks
+ * like an identifier is passed through; pi's `theme.fg(token, text)` throws on
+ * unknown tokens and `styleStatusText` catches the throw to fall back to plain
+ * text (with a one-time warning, emitted by the runtime).
+ */
+const THEME_TOKEN_RE = /^[a-zA-Z][a-zA-Z0-9]*$/;
+
+const ANSI_NAMED_COLOR_CODES: Readonly<Record<string, number>> = {
+	black: 30,
+	red: 31,
+	green: 32,
+	yellow: 33,
+	blue: 34,
+	magenta: 35,
+	cyan: 36,
+	white: 37,
+	brightBlack: 90,
+	brightRed: 91,
+	brightGreen: 92,
+	brightYellow: 93,
+	brightBlue: 94,
+	brightMagenta: 95,
+	brightCyan: 96,
+	brightWhite: 97,
+};
+
+const ANSI_FG_RESET = "\x1b[39m";
+const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const STATUS_COLOR_ERROR =
+	'expected a ThemeColor token (e.g. "accent"), a hex color (e.g. "#00d7ff"), or an ANSI color name (e.g. "cyan", "brightMagenta")';
+
+function expandHex3(hex: string): string {
+	// "#abc" -> "#aabbcc"
+	return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`;
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+	const full = hex.length === 4 ? expandHex3(hex) : hex;
+	return {
+		r: parseInt(full.slice(1, 3), 16),
+		g: parseInt(full.slice(3, 5), 16),
+		b: parseInt(full.slice(5, 7), 16),
+	};
+}
+
+export function parseStatusColor(value: unknown): ParseResult<StatusColor> {
+	if (typeof value !== "string" || value.trim() !== value || value.length === 0) {
+		return { ok: false, error: STATUS_COLOR_ERROR };
+	}
+
+	if (HEX_COLOR_RE.test(value)) {
+		const { r, g, b } = hexToRgb(value);
+		return {
+			ok: true,
+			value: { kind: "ansi", open: `\x1b[38;2;${r};${g};${b}m`, close: ANSI_FG_RESET },
+		};
+	}
+
+	const ansiCode = ANSI_NAMED_COLOR_CODES[value];
+	if (ansiCode !== undefined) {
+		return {
+			ok: true,
+			value: { kind: "ansi", open: `\x1b[${ansiCode}m`, close: ANSI_FG_RESET },
+		};
+	}
+
+	if (THEME_TOKEN_RE.test(value)) {
+		return { ok: true, value: { kind: "theme", token: value as ThemeColor } };
+	}
+
+	return { ok: false, error: STATUS_COLOR_ERROR };
 }
 
 function parseSummaryRetention(value: unknown): ParseResult<SummaryRetentionPolicy> {

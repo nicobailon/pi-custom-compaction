@@ -261,7 +261,8 @@ Example update template (`compaction-template-update.md`):
   "name": "ctx",
   "showStatus": true,
   "minimalStatus": false,
-  "quiet": false
+  "quiet": false,
+  "statusColor": "accent"
 }
 ```
 
@@ -271,6 +272,17 @@ Example update template (`compaction-template-update.md`):
 | `showStatus` | Show status bar | `true` |
 | `minimalStatus` | Short format (just percentage) | `false` |
 | `quiet` | Suppress non-critical notifications | `false` |
+| `statusColor` | Color the whole status-bar entry (see below) | _unset_ (terminal default) |
+
+### `statusColor` values
+
+Three forms are accepted. Malformed values (wrong shape, empty string, non-string) are rejected at config load with `Invalid ui.statusColor: …`. Well-shaped but unknown theme tokens (e.g. a typo like `"accen"`, or a token removed in a future pi version) are caught at first render and surfaced as a one-time warning; the status line then falls back to the terminal's default foreground.
+
+| Form | Example | Behavior |
+| --- | --- | --- |
+| pi theme token | `"accent"`, `"success"`, `"warning"`, `"error"`, `"muted"`, `"borderAccent"`, … | Rendered via `theme.fg(token, text)` so the color adapts when the pi theme changes. Any token in pi's `ThemeColor` union is accepted; validity is checked by pi itself at render time rather than duplicated here. |
+| hex color | `"#00d7ff"`, `"#f0a"` | Emitted as a truecolor ANSI escape. Same hex on every theme. Both `#rgb` and `#rrggbb` are accepted. |
+| ANSI color name | `"black"`, `"red"`, `"green"`, `"yellow"`, `"blue"`, `"magenta"`, `"cyan"`, `"white"` plus `brightBlack` … `brightWhite` | Emitted as a basic-ANSI escape. Exact rendering depends on the terminal's palette. |
 
 Status bar examples:
 

@@ -1,5 +1,43 @@
 import { applyProfileOverrides } from "../policy/merge.js";
-import type { CompactionPolicy, ProfileOverride, ProactiveTriggerInput } from "../policy/types.js";
+import type { CompactionPolicy, ProfileOverride, ProactiveTriggerInput, StatusColor } from "../policy/types.js";
+
+/**
+ * Minimal slice of pi's `Theme` needed to render status text. Taking just the
+ * `fg` method keeps this helper pure and easy to stub in unit tests.
+ */
+export interface StatusStyleTheme {
+	fg(color: string, text: string): string;
+}
+
+/**
+ * Wrap a plain status string with ANSI colouring according to `statusColor`.
+ *
+ * Called from `updateStatus` for every `setStatus(...)` write so the whole
+ * status line (prefix + percentage + inline states like `compacting…`) shares
+ * one colour. When `statusColor` is undefined the text is returned as-is so
+ * the footer renders in the terminal's default foreground.
+ *
+ * If `statusColor.kind === "theme"` and the token isn't recognised by the
+ * current theme, `theme.fg` throws; this helper swallows the throw and
+ * returns the plain text, so an unknown token degrades gracefully instead of
+ * crashing the footer. The runtime emits a one-time warning so the user can
+ * see *why* the color didn't take effect.
+ */
+export function styleStatusText(
+	text: string,
+	statusColor: StatusColor | undefined,
+	theme: StatusStyleTheme,
+): string {
+	if (!statusColor) return text;
+	if (statusColor.kind === "theme") {
+		try {
+			return theme.fg(statusColor.token, text);
+		} catch {
+			return text;
+		}
+	}
+	return `${statusColor.open}${text}${statusColor.close}`;
+}
 
 export function resolveEffectivePolicy(
 	ctx: { model?: { provider: string; id: string } },

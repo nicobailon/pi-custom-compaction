@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 — 2026-05-03
+
+- Add `ui.statusColor` to color the custom-compaction status-bar entry. Accepts a pi `ThemeColor` token (e.g. `accent`, `success`, `borderAccent`) for theme-adaptive rendering, a hex color (`#00d7ff`, `#f0a`) for truecolor ANSI, or a named ANSI color (`cyan`, `brightMagenta`, …). Omit for current behavior (terminal default).
+- Expand parse/merge tests for `ui.statusColor` and add unit coverage for the `styleStatusText` helper that applies the color at every `setStatus` call site.
+
 ## 0.2.5 — 2026-04-04
 
 - Add configurable `summaryRetention` controls so custom compaction can keep a chosen raw token amount or context-window percentage before summarizing older history.

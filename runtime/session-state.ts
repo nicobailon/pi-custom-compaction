@@ -3,6 +3,7 @@ import { Loader } from "@mariozechner/pi-tui";
 import { mergePolicy } from "../policy/merge.js";
 import { readProjectPolicyPatch } from "../policy/config.js";
 import { DEFAULT_POLICY, type CompactionPolicy } from "../policy/types.js";
+import { styleStatusText } from "./pure.js";
 import { formatSummaryRetention } from "./retention.js";
 
 const STATUS_KEY = "compact-policy";
@@ -121,15 +122,36 @@ export function createRuntimeServices(): RuntimeServices {
 		const retentionText = formatSummaryRetention(policy.summaryRetention);
 		const statusPrefix = retentionText ? `${prefix} · ${retentionText}` : prefix;
 
+		// Probe theme tokens once per unique token. Pi's `theme.fg` throws on
+		// unknown tokens (see theme.js); `styleStatusText` swallows the throw and
+		// falls back to plain text, but without this probe the user would have no
+		// idea why their chosen `ui.statusColor` didn't take effect.
+		const sc = policy.ui.statusColor;
+		if (sc?.kind === "theme") {
+			try {
+				ctx.ui.theme.fg(sc.token, "");
+			} catch {
+				notify(
+					ctx,
+					policy,
+					"warning",
+					`Invalid ui.statusColor: unknown theme token "${sc.token}". Falling back to terminal default.`,
+					{ dedupeKey: `statusColor:${sc.token}` },
+				);
+			}
+		}
+
+		const style = (text: string) => styleStatusText(text, sc, ctx.ui.theme);
+
 		if (inFlight.active) {
-			ctx.ui.setStatus(STATUS_KEY, `${statusPrefix} · compacting…`);
+			ctx.ui.setStatus(STATUS_KEY, style(`${statusPrefix} · compacting…`));
 			return;
 		}
 
 		const usage = ctx.getContextUsage();
 
 		if (!usage || usage.tokens === null) {
-			ctx.ui.setStatus(STATUS_KEY, postCompact ? statusPrefix : `${statusPrefix} · ?`);
+			ctx.ui.setStatus(STATUS_KEY, style(postCompact ? statusPrefix : `${statusPrefix} · ?`));
 			return;
 		}
 		postCompact = false;
@@ -142,9 +164,11 @@ export function createRuntimeServices(): RuntimeServices {
 
 		ctx.ui.setStatus(
 			STATUS_KEY,
-			policy.ui.minimalStatus
-				? `${statusPrefix} · ${pct.toFixed(0)}%`
-				: `${statusPrefix} · ${pct.toFixed(1)}% (${usage.tokens}/${limit})`,
+			style(
+				policy.ui.minimalStatus
+					? `${statusPrefix} · ${pct.toFixed(0)}%`
+					: `${statusPrefix} · ${pct.toFixed(1)}% (${usage.tokens}/${limit})`,
+			),
 		);
 	}
 

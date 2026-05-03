@@ -3,6 +3,7 @@ import type {
 	CompactionPolicyPatch,
 	PolicyKey,
 	ProfileOverride,
+	StatusColor,
 	SummaryThinkingLevel,
 } from "./types.js";
 
@@ -34,6 +35,9 @@ export function setPatchValue(patch: CompactionPolicyPatch, key: PolicyKey, valu
 			return;
 		case "ui.minimalStatus":
 			patch.ui = { ...patch.ui, minimalStatus: value as boolean };
+			return;
+		case "ui.statusColor":
+			patch.ui = { ...patch.ui, statusColor: value as StatusColor };
 			return;
 		case "summary.thinkingLevel":
 			patch.summary = { ...patch.summary, thinkingLevel: value as SummaryThinkingLevel };

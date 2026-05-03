@@ -94,6 +94,7 @@ describe("setPatchValue", () => {
 			"ui.quiet": true,
 			"ui.showStatus": false,
 			"ui.minimalStatus": true,
+			"ui.statusColor": { kind: "theme", token: "accent" },
 			"summary.thinkingLevel": "high",
 			"summary.preservationInstruction": "Keep exact text.",
 		};
@@ -115,6 +116,7 @@ describe("setPatchValue", () => {
 				quiet: true,
 				showStatus: false,
 				minimalStatus: true,
+				statusColor: { kind: "theme", token: "accent" },
 			},
 			summary: {
 				thinkingLevel: "high",

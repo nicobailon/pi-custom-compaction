@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { findMatchingProfile, resolveEffectivePolicy, shouldTriggerProactiveCompact } from "../runtime/pure.ts";
+import { findMatchingProfile, resolveEffectivePolicy, shouldTriggerProactiveCompact, styleStatusText } from "../runtime/pure.ts";
 import { DEFAULT_POLICY, type CompactionPolicy, type ProactiveTriggerInput } from "../policy/types.ts";
 
 function makePolicy(): CompactionPolicy {
@@ -198,5 +198,62 @@ describe("findMatchingProfile", () => {
 	it("returns undefined when there is no match", () => {
 		const result = findMatchingProfile({ only: { match: "openai/gpt-4" } }, "anthropic/claude-3-opus");
 		assert.equal(result, undefined);
+	});
+});
+
+describe("styleStatusText", () => {
+	const fakeTheme = {
+		fg: (color: string, text: string) => `<fg:${color}>${text}</fg>`,
+	};
+
+	it("returns the text unchanged when statusColor is undefined", () => {
+		assert.equal(styleStatusText("compact · 42%", undefined, fakeTheme), "compact · 42%");
+	});
+
+	it("wraps text with theme.fg when statusColor.kind is 'theme'", () => {
+		assert.equal(
+			styleStatusText("compact · 42%", { kind: "theme", token: "accent" }, fakeTheme),
+			"<fg:accent>compact · 42%</fg>",
+		);
+	});
+
+	it("wraps text with raw ANSI open/close when statusColor.kind is 'ansi'", () => {
+		assert.equal(
+			styleStatusText(
+				"compact · 42%",
+				{ kind: "ansi", open: "\x1b[36m", close: "\x1b[39m" },
+				fakeTheme,
+			),
+			"\x1b[36mcompact · 42%\x1b[39m",
+		);
+	});
+
+	it("does not call theme.fg for ANSI colors", () => {
+		let called = false;
+		const spyTheme = {
+			fg: (color: string, text: string) => {
+				called = true;
+				return `<should-not-happen:${color}>${text}</should-not-happen>`;
+			},
+		};
+		styleStatusText("x", { kind: "ansi", open: "\x1b[31m", close: "\x1b[39m" }, spyTheme);
+		assert.equal(called, false);
+	});
+
+	it("falls back to plain text when theme.fg throws (unknown theme token)", () => {
+		// Mirrors pi's real Theme.fg behavior: `throw new Error('Unknown theme color: ...')`
+		const throwingTheme = {
+			fg: (color: string) => {
+				throw new Error(`Unknown theme color: ${color}`);
+			},
+		};
+		assert.equal(
+			styleStatusText(
+				"compact · 42%",
+				{ kind: "theme", token: "not-a-real-token" as unknown as never },
+				throwingTheme,
+			),
+			"compact · 42%",
+		);
 	});
 });

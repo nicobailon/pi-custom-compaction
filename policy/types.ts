@@ -1,7 +1,21 @@
 import type { AssistantMessage } from "@mariozechner/pi-ai";
-import type { ContextUsage } from "@mariozechner/pi-coding-agent";
+import type { ContextUsage, ThemeColor } from "@mariozechner/pi-coding-agent";
 
 export type SummaryThinkingLevel = "off" | "low" | "medium" | "high";
+
+/**
+ * Parsed status-bar color. Produced by `parseStatusColor` so runtime styling
+ * is an O(1) string wrap with no re-validation.
+ *
+ * - `theme`: resolved at render time via `ctx.ui.theme.fg(token, text)`, so the
+ *   color follows theme switching.
+ * - `ansi`: pre-baked ANSI escape pair; applied as `open + text + close`. Use
+ *   this for hex (`#00d7ff`) and named-ANSI (`cyan`, `brightMagenta`) inputs
+ *   that should render identically across themes.
+ */
+export type StatusColor =
+	| { kind: "theme"; token: ThemeColor }
+	| { kind: "ansi"; open: string; close: string };
 
 export type PolicyKey =
 	| "trigger.maxTokens"
@@ -13,6 +27,7 @@ export type PolicyKey =
 	| "ui.quiet"
 	| "ui.showStatus"
 	| "ui.minimalStatus"
+	| "ui.statusColor"
 	| "summary.thinkingLevel"
 	| "summary.preservationInstruction";
 
@@ -50,6 +65,7 @@ export interface CompactionPolicy {
 		quiet: boolean;
 		showStatus: boolean;
 		minimalStatus: boolean;
+		statusColor?: StatusColor;
 	};
 	summary: SummaryPolicy;
 	summaryRetention?: SummaryRetentionPolicy;
@@ -134,6 +150,7 @@ export const POLICY_KEYS: PolicyKey[] = [
 	"ui.quiet",
 	"ui.showStatus",
 	"ui.minimalStatus",
+	"ui.statusColor",
 	"summary.thinkingLevel",
 	"summary.preservationInstruction",
 ];
